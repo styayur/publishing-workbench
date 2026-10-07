@@ -1,17 +1,19 @@
-# v0.2.0 verification report
+# v0.2.1 verification report
 
 验证日期：2026-10-08，Windows x64。本报告记录本地执行结果，不代表真实 WP/微信账号或生产部署已经验证。
 
 ## Application checks
 
 - `cargo fmt --check` / `cargo clippy --all-targets -- -D warnings`：通过。
-- `cargo test`：31 tests，16 原适配器回归 + 15 Reliable Publishing tests，全部通过。
+- `cargo test`：32 tests，16 原适配器回归 + 16 Reliable Publishing tests，全部通过。
 - `npm test`：7 tests 通过。
 - `npm run lint`：ESLint / Prettier 通过。
 - `npm run build`：TypeScript / Vite 通过。
 - `npm run tauri -- build`：Windows release EXE 构建成功。
 - Python Playwright GUI smoke：Editor、schema 表单、secret 清空显示、capability-driven actions、多目标部分失败、History、sandbox Preview、Settings、小屏布局，无 JavaScript 错误。
 - Native WebView2 smoke：实际 Release EXE + Tauri IPC + Rust loopback HTTP；本地保存、local-image data-URL preview、路径导入复用 ID、自动 DGE 探测、REST HEAD、create→update、SQLite mapping/journal 和无密钥磁盘字段全部通过。使用 `WORKBENCH_DATA_DIR` 隔离临时 profile，未改用户正常工作区。
+
+v0.2.1 添加引用式 Markdown、raw HTML img URL 替换及代码示例不被改写的回归测试。
 
 ## Reliable tests
 
@@ -35,7 +37,7 @@
 
 ## Release assessment
 
-适合发布 **v0.2.0 MVP 预览版**，不能承诺所有外部 CMS 的 exactly-once、跨平台安装包或生产账号验证。GitHub Release 标为 pre-release，Windows portable 未签名。主要生产风险及下一版 5 项优先工作见 reliability.md。
+适合发布 **v0.2.1 MVP 预览版**，不能承诺所有外部 CMS 的 exactly-once、跨平台安装包或生产账号验证。GitHub Release 标为 pre-release，Windows portable 未签名。主要生产风险及下一版 5 项优先工作见 reliability.md。
 
 ## Reproduce GUI/native checks
 

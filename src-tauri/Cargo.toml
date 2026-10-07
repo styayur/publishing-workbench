@@ -1,6 +1,6 @@
 [package]
 name = "publishing-workbench"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 description = "Local CMS-agnostic publishing workbench"
 license = "AGPL-3.0-only"

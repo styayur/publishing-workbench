@@ -53,17 +53,81 @@ pub fn markdown(content: &Content) -> Prepared {
 }
 pub fn replace_markdown_image(p: &mut Prepared, source: &str, target: &str) {
     let mut replacements = Vec::new();
-    for (event, range) in Parser::new(&p.content.body).into_offset_iter() {
-        if let pulldown_cmark::Event::Start(pulldown_cmark::Tag::Image { dest_url, .. }) = event {
-            let dest = dest_url.as_ref();
-            if dest == source
-                || percent_encoding::percent_decode_str(source)
-                    .decode_utf8()
-                    .is_ok_and(|s| s == dest)
-            {
-                let slice = &p.content.body[range.clone()];
-                replacements.push((range, slice.replacen(dest, target, 1)));
+    let same = |dest: &str| {
+        html_escape::decode_html_entities(dest) == source
+            || percent_encoding::percent_decode_str(source)
+                .decode_utf8()
+                .is_ok_and(|s| s == dest)
+    };
+    let img =
+        regex::Regex::new(r#"(?is)(<img\b[^>]*?\bsrc\s*=\s*)(?:"([^"]*)"|'([^']*)'|([^\s>]+))"#)
+            .expect("HTML image");
+    let mut events = Parser::new(&p.content.body).into_offset_iter();
+    while let Some((event, range)) = events.next() {
+        match event {
+            pulldown_cmark::Event::Start(pulldown_cmark::Tag::Image {
+                dest_url, title, ..
+            }) if same(dest_url.as_ref()) => {
+                let mut alt = String::new();
+                let mut depth = 1;
+                for (child, _) in events.by_ref() {
+                    match child {
+                        pulldown_cmark::Event::Start(pulldown_cmark::Tag::Image { .. }) => {
+                            depth += 1
+                        }
+                        pulldown_cmark::Event::End(pulldown_cmark::TagEnd::Image) => {
+                            depth -= 1;
+                            if depth == 0 {
+                                break;
+                            }
+                        }
+                        pulldown_cmark::Event::Text(t) | pulldown_cmark::Event::Code(t) => {
+                            alt.push_str(&t)
+                        }
+                        _ => {}
+                    }
+                }
+                let alt = alt
+                    .replace('\\', "\\\\")
+                    .replace('[', "\\[")
+                    .replace(']', "\\]");
+                let title = if title.is_empty() {
+                    String::new()
+                } else {
+                    format!(" \"{}\"", title.replace('\\', "\\\\").replace('"', "\\\""))
+                };
+                let target = target
+                    .replace('(', "%28")
+                    .replace(')', "%29")
+                    .replace(' ', "%20");
+                replacements.push((range, format!("![{alt}]({target}{title})")));
             }
+            pulldown_cmark::Event::Html(_) | pulldown_cmark::Event::InlineHtml(_) => {
+                let slice = &p.content.body[range.clone()];
+                let rendered = img
+                    .replace_all(slice, |capture: &regex::Captures<'_>| {
+                        let dest = capture
+                            .get(2)
+                            .or_else(|| capture.get(3))
+                            .or_else(|| capture.get(4))
+                            .expect("src")
+                            .as_str();
+                        if same(dest) {
+                            format!(
+                                "{}\"{}\"",
+                                &capture[1],
+                                html_escape::encode_double_quoted_attribute(target)
+                            )
+                        } else {
+                            capture[0].to_string()
+                        }
+                    })
+                    .into_owned();
+                if rendered != slice {
+                    replacements.push((range, rendered));
+                }
+            }
+            _ => {}
         }
     }
     for (range, value) in replacements.into_iter().rev() {

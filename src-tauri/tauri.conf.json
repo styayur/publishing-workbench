@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Publishing Workbench",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "identifier": "dev.styayur.publishing-workbench",
   "build": {
     "beforeDevCommand": "npm run dev",

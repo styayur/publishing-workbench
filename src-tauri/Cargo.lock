@@ -2747,7 +2747,7 @@ dependencies = [
 
 [[package]]
 name = "publishing-workbench"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "ammonia",
  "async-trait",

@@ -1,5 +1,7 @@
 # v0.2.0 — Reliable Publishing MVP
 
+Superseded by [v0.2.1](https://github.com/styayur/publishing-workbench/releases/tag/v0.2.1), which fixes Git asset URL replacement for reference-style Markdown and raw HTML images. Use the newer preview release.
+
 This pre-release extends the existing Tauri/Rust/React workbench with durable local publishing state and a fourth destination, Git Content.
 
 - Stable article UUIDs, SQLite migration/versioning, remote mapping, checkpoint journal and Retry/Resume.

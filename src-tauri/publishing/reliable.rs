@@ -305,7 +305,7 @@ impl ReliablePublishing {
                     public_cfg.remove(key);
                 }
             }
-            j.content_hash=storage::hash(json!({"content":j.content,"action":j.action,"assets":j.asset_inputs.iter().map(|a|(&a.source,&a.hash,&a.variant)).collect::<Vec<_>>(),"config":public_cfg}).to_string().as_bytes());
+            j.content_hash=storage::hash(json!({"content":j.content,"action":j.action,"transform_version":publisher.manifest().version,"assets":j.asset_inputs.iter().map(|a|(&a.source,&a.hash,&a.variant)).collect::<Vec<_>>(),"config":public_cfg}).to_string().as_bytes());
             j.prepared = Some(p);
             self.checkpoint(j, 0, "success", "内容和素材已快照；重试使用此版本")?;
         }

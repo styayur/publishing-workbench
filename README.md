@@ -2,7 +2,9 @@
 
 轻量、本地优先的 CMS-agnostic 发布工作台。Tauri 2 + Rust + React / TypeScript。编辑或导入 Markdown / MDX / Canonical JSON，由能力声明和配置 schema 驱动扩展 GUI。
 
-**v0.2.0 是可运行的 MVP 预览版。** 提供可靠发布日志、远端映射、SQLite、素材 SHA-256 去重和 Git Content / Digital Garden profile。WordPress、微信公众号和 Generic REST 保留原有适配。没有账号系统、云数据库或生产部署客户端。
+**v0.2.1 是可运行的 MVP 预览版。** 提供可靠发布日志、远端映射、SQLite、素材 SHA-256 去重和 Git Content / Digital Garden profile。WordPress、微信公众号和 Generic REST 保留原有适配。没有账号系统、云数据库或生产部署客户端。
+
+v0.2.1 修复 Git 输出中引用式 Markdown / raw HTML 图片的 URL 替换，保留代码示例不变；已有 v0.2.0 标签保留，建议使用最新修正版。
 
 ## 本地启动
 
@@ -88,7 +90,7 @@ process restart: running → interrupted → resume
 safe pre-remote failure → cancelled
 ```
 
-每个任务持久化六步：transform → upload assets → upload cover → create/update remote → save mapping → complete。SQLite 将 job 和 steps 原子保存。已有 remote_id 时用 update；相同内容/动作/非密钥配置/素材哈希跳过远端写入。成功回执先持久化，再保存 mapping。失败、断电和未知远端状态不能被当作不存在的文章。
+每个任务持久化六步：transform → upload assets → upload cover → create/update remote → save mapping → complete。SQLite 将 job 和 steps 原子保存。已有 remote_id 时用 update；相同内容/动作/扩展转换版本/非密钥配置/素材哈希跳过远端写入。成功回执先持久化，再保存 mapping。失败、断电和未知远端状态不能被当作不存在的文章。
 
 超时/5xx/回执缺失可能代表服务已创建文章，不能保证所有外部服务恰好执行一次。此时阻止盲目 create，WP 按 slug + job marker 查找回执；Git 通过持久化文件事务恢复；REST 仅在用户确认服务器实现 Idempotency-Key 后自动重发；微信需要人工核对 media_id。所有 REST 任务发送固定 Idempotency-Key 和 X-Article-Id，声明幂等必须由服务器实际兑现。收到无 ID 的 204 创建保留空映射；再次修改时停止，避免重复创建。
 

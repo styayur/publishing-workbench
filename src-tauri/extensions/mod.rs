@@ -24,7 +24,7 @@ pub fn manifest(
     Manifest {
         id: id.into(),
         name: name.into(),
-        version: "0.2.0".into(),
+        version: "0.2.1".into(),
         description: description.into(),
         capabilities: caps.iter().map(|s| s.to_string()).collect(),
         schema: json!({"type":"object", "properties":properties,"required":required}),

@@ -85,7 +85,7 @@ try:
         gardens=page.evaluate("()=>window.__TAURI_INTERNALS__.invoke('detect_gardens')")
         assert any('styayur.co.uk' in g['label'] for g in gardens),gardens
         page.get_by_role('button',name='Extensions',exact=True).click()
-        generic=page.locator('section.extension').filter(has=page.get_by_role('heading',name='Generic REST v0.2.0'))
+        generic=page.locator('section.extension').filter(has=page.get_by_role('heading',name='Generic REST v0.2.1'))
         generic.get_by_label('Update endpoint（可选，{{remote_id}}）').fill(f'http://127.0.0.1:{server.server_port}/articles/{{{{remote_id}}}}')
         generic.get_by_label(re.compile(r'^Endpoint')).fill(f'http://127.0.0.1:{server.server_port}/articles')
         generic.get_by_role('button',name='保存配置',exact=True).click()
@@ -104,6 +104,13 @@ try:
         assert '<strong>真实 Rust 转换</strong>' in payloads[0]['content']
         publication=page.evaluate("() => window.__TAURI_INTERNALS__.invoke('publication_state',{articleId:document.querySelector('.publish-summary small').textContent})")
         assert publication['jobs'][0]['receipt']['id']=='native-smoke-42'
+        # The binary must include transform version in its immutable content hash.
+        import hashlib
+        job=publication['jobs'][0]
+        ws=page.evaluate("()=>window.__TAURI_INTERNALS__.invoke('load_workspace')")
+        material={'content':job['content'],'action':job['action'],'transform_version':'0.2.1','assets':[],'config':ws['extensions']['generic-rest']}
+        assert job['content_hash']==hashlib.sha256(json.dumps(material,ensure_ascii=False,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+
         page.get_by_role('button',name='Editor',exact=True).click()
         page.get_by_label('正文 Markdown').fill('# Native title\n\nUpdated through the same mapping')
         page.get_by_role('button',name='Publish',exact=True).click()

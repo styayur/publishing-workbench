@@ -620,3 +620,20 @@ async fn rest_idempotent_contract_retries_same_key() {
         .await;
     assert_eq!(p.retry(&j.job_id, &cfg).await.unwrap().status, "success");
 }
+
+#[test]
+fn reference_and_html_images_replace_without_touching_code() {
+    use publishing_workbench::transform::{markdown, replace_markdown_image};
+    let mut a = c();
+    a.body="![Inline](a.png)\n\n![Ref][image]\n\n[image]: a.png\n\n<img src='a.png' alt='raw'>\n\n`<img src='a.png'>`".into();
+    let mut p = markdown(&a);
+    replace_markdown_image(&mut p, "a.png", "/garden-assets/hash.png");
+    let html = markdown(&p.content).html;
+    assert_eq!(
+        html.matches("src=\"/garden-assets/hash.png\"").count(),
+        3,
+        "{html}"
+    );
+    assert!(p.content.body.contains("`<img src='a.png'>`"));
+    assert!(html.contains("alt=\"Ref\""));
+}

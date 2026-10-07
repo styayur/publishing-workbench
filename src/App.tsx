@@ -165,7 +165,7 @@ export default function App() {
             <br />
             Your destinations out.
           </p>
-          <small>v0.2.0 · Reliable publishing</small>
+          <small>v0.2.1 · Reliable publishing</small>
         </div>
       </aside>
       <div className="main">
