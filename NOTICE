@@ -1,0 +1,9 @@
+Publishing Workbench
+Copyright (c) 2026 Stya Yur Open Source Studio
+
+First-party application source: AGPL-3.0-only (LICENSE).
+First-party prose in README.md, docs/, and example article text: CC BY 4.0 (LICENSE-CONTENT).
+Software snippets and configuration examples: AGPL-3.0-only.
+Third-party dependencies retain their original terms (THIRD_PARTY.md).
+No content, credentials or source from the private styayur.co.uk repository is distributed.
+Digital Garden Engine is an external compatibility target; its source is not bundled.

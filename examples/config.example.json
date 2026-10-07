@@ -1,0 +1,32 @@
+{
+  "wordpress": {
+    "url": "https://example.com",
+    "username": "editor",
+    "categories": "1,2"
+  },
+  "wechat": {
+    "appid": "YOUR_APP_ID"
+  },
+  "generic-rest": {
+    "endpoint": "https://example.com/articles",
+    "method": "POST",
+    "template": "{\"title\":\"{{title}}\",\"content\":\"{{html}}\",\"tags\":\"{{tags}}\",\"status\":\"{{action}}\"}",
+    "update_endpoint": "https://example.com/articles/{{remote_id}}",
+    "update_method": "PUT",
+    "idempotency_supported": "false"
+  },
+  "git-content": {
+    "repository_path": "C:/replace-with-content-repository",
+    "profile": "Digital Garden Engine",
+    "content_kind": "Writing",
+    "published_posts_path": "content/published/posts",
+    "published_projects_path": "content/published/projects",
+    "published_library_path": "content/published/library",
+    "draft_path": "content/drafts",
+    "private_path": "content/private",
+    "assets_path": "content/published/assets",
+    "auto_commit": "false",
+    "auto_push": "false",
+    "commit_template": "content: {{operation}} {{slug}}"
+  }
+}

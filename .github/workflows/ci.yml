@@ -1,0 +1,30 @@
+name: Workbench checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - run: npm ci
+      - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+      - run: cargo test --locked --manifest-path src-tauri/Cargo.toml
+      - run: npm test
+      - run: npm run lint
+      - run: npm run build
+      - run: npm run tauri -- build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: publishing-workbench-windows
+          path: src-tauri/target/release/publishing-workbench.exe

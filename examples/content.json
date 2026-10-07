@@ -1,0 +1,16 @@
+{
+  "title": "一篇文章，多个目的地",
+  "slug": "one-story",
+  "summary": "本地发布工作台示例",
+  "body": "# 开始写作\n\n这是 **Markdown** 正文。\n\n![示例图片](images/body.png)",
+  "cover": "images/cover.jpg",
+  "authors": ["Editor"],
+  "tags": ["writing"],
+  "metadata": {
+    "categories": [1],
+    "author_id": 1
+  },
+  "article_id": "3874b5f0-67e9-4c50-9149-9e017c4a2fb2",
+  "format": "markdown",
+  "source_path": null
+}
