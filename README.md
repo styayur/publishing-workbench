@@ -6,6 +6,10 @@
 
 v0.2.1 修复 Git 输出中引用式 Markdown / raw HTML 图片的 URL 替换，保留代码示例不变；已有 v0.2.0 标签保留，建议使用最新修正版。
 
+![Publishing Workbench v0.2.1 Windows 桌面程序，正在预览内置示例文章的 Markdown 标题、列表和引用](docs/assets/desktop-preview-v0.2.1.png)
+
+真实桌面预览，使用内置示例数据；不代表远端发布或网站部署成功。[截图来源与重复捕获步骤](docs/README_SCREENSHOTS.md)。
+
 ## 本地启动
 
 需要 Node.js 22+、Rust stable、Git。Windows 需要 Microsoft C++ Build Tools 和 WebView2 Runtime；macOS/Linux 按 [Tauri 官方 prerequisites](https://v2.tauri.app/start/prerequisites/) 安装平台依赖。
