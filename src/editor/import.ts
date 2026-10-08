@@ -19,12 +19,17 @@ export function importContent(text: string, json: boolean): Content {
         throw Error('article_id 必须为 UUID');
       body = text.slice(match[0].length);
     }
+    const articleMarker = body.match(
+      /<!-- workbench article:([0-9a-f-]{36}) -->/i,
+    )?.[1];
     return {
       ...sample,
       article_id:
         typeof metadata.article_id === 'string'
           ? metadata.article_id
-          : crypto.randomUUID(),
+          : articleMarker && uuid.test(articleMarker)
+            ? articleMarker
+            : crypto.randomUUID(),
       title:
         typeof metadata.title === 'string'
           ? metadata.title

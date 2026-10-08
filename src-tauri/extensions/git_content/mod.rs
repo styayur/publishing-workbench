@@ -17,6 +17,11 @@ use std::{
 };
 
 pub struct GitContent;
+fn valid_date(value: &str) -> bool {
+    value.len() == 10
+        && chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d")
+            .is_ok_and(|date| date.format("%Y-%m-%d").to_string() == value)
+}
 fn git(root: &Path, args: &[&str]) -> Result<String> {
     let output = Command::new("git")
         .arg("-C")
@@ -95,11 +100,12 @@ fn kind(c: &Content, cfg: &Config) -> Result<&'static str> {
         .unwrap_or(option(cfg, "content_kind", "Writing"))
     {
         "Writing" => Ok("posts"),
-        "Project" => Ok("projects"),
+        "Project" | "Concepts & Research" => Ok("projects"),
+        "About" | "Now" => Ok("pages"),
         "Library" => Ok("library"),
         _ => Err(Error::new(
             "validation",
-            "content_kind 必须为 Writing、Project 或 Library",
+            "content_kind 必须为 Writing、Project、Concepts & Research、Library、About 或 Now",
         )),
     }
 }
@@ -137,11 +143,13 @@ fn content_directory(cfg: &Config, status: &str, kind: &str) -> String {
             match kind {
                 "projects" => "published_projects_path",
                 "library" => "published_library_path",
+                "pages" => "published_pages_path",
                 _ => "published_posts_path",
             },
             match kind {
                 "projects" => "content/published/projects",
                 "library" => "content/published/library",
+                "pages" => "content/published/pages",
                 _ => "content/published/posts",
             },
         )
@@ -172,16 +180,43 @@ pub fn document(c: &Content, cfg: &Config, status: &str) -> Result<String> {
         ));
     }
     let kind = kind(c, cfg)?;
-    let date = c
-        .metadata
-        .get("date")
-        .and_then(Value::as_str)
-        .map(str::to_owned)
-        .unwrap_or_else(|| chrono::Local::now().format("%Y-%m-%d").to_string());
-    if chrono::NaiveDate::parse_from_str(&date, "%Y-%m-%d").is_err() {
-        return Err(Error::new("validation", "date 必须为有效 YYYY-MM-DD"));
+    let date = c.metadata.get("date").and_then(Value::as_str);
+    if date.is_some_and(|d| !valid_date(d)) || (status == "published" && date.is_none()) {
+        return Err(Error::new(
+            "validation",
+            "发布必须显式提供有效 YYYY-MM-DD date；草稿可不设日期",
+        ));
     }
-    let mut fm = json!({"title":c.title,"slug":c.slug,"date":date,"status":status,"description":c.summary,"tags":c.tags});
+    let mut fm = json!({"title":c.title,"slug":c.slug,"status":status,"description":c.summary,"tags":c.tags});
+    if let Some(date) = date {
+        fm["date"] = json!(date);
+    }
+    for key in ["updated", "createdAt", "updatedAt", "releasedAt"] {
+        if let Some(value) = c.metadata.get(key) {
+            if !value.as_str().is_some_and(valid_date) {
+                return Err(Error::new("validation", "日期字段必须为有效 YYYY-MM-DD"));
+            }
+            if key == "updated" || kind == "projects" {
+                fm[key] = value.clone();
+            }
+        }
+    }
+    if kind == "pages" {
+        let expected = c
+            .metadata
+            .get("content_kind")
+            .and_then(Value::as_str)
+            .unwrap_or(option(cfg, "content_kind", "Writing"));
+        if !matches!(
+            (expected, c.slug.as_str()),
+            ("About", "about") | ("Now", "now")
+        ) {
+            return Err(Error::new(
+                "validation",
+                "About/Now 单例 slug 必须为 about/now",
+            ));
+        }
+    }
     if kind == "posts" {
         let maturity = c
             .metadata
@@ -194,7 +229,7 @@ pub fn document(c: &Content, cfg: &Config, status: &str) -> Result<String> {
         fm["maturity"] = json!(maturity);
     }
     if kind == "projects" {
-        let defaults = json!({"name":c.title,"summary":c.summary,"year":&date[..4],"projectStatus":"experimental","category":"experiments","featured":false,"priority":0,"stack":[],"links":[]});
+        let defaults = json!({"name":c.title,"summary":c.summary,"year":date.map(|d| &d[..4]).unwrap_or("undated"),"projectStatus":"experimental","category":"experiments","featured":false,"priority":0,"stack":[],"links":[]});
         for (key, value) in defaults.as_object().expect("object") {
             fm[key] = c
                 .metadata
@@ -204,7 +239,7 @@ pub fn document(c: &Content, cfg: &Config, status: &str) -> Result<String> {
         }
         if !matches!(
             fm["projectStatus"].as_str(),
-            Some("stable" | "beta" | "research" | "experimental" | "maintenance")
+            Some("stable" | "beta" | "alpha" | "research" | "experimental" | "maintenance")
         ) || !matches!(
             fm["category"].as_str(),
             Some(
@@ -223,6 +258,49 @@ pub fn document(c: &Content, cfg: &Config, status: &str) -> Result<String> {
             || !fm["links"].is_array()
         {
             return Err(Error::new("validation", "Project metadata 类型或枚举无效"));
+        }
+        let selection = c
+            .metadata
+            .get("content_kind")
+            .and_then(Value::as_str)
+            .unwrap_or(option(cfg, "content_kind", "Writing"));
+        if selection == "Concepts & Research" {
+            fm["category"] = json!("concepts");
+        }
+        for key in ["imageAlt", "engineeringMaturity", "researchStatus"] {
+            if let Some(value) = c.metadata.get(key) {
+                if !value.is_string() {
+                    return Err(Error::new("validation", "项目展示字段必须为字符串"));
+                }
+                fm[key] = value.clone();
+            }
+        }
+        if fm.get("engineeringMaturity").is_some_and(|v| {
+            !matches!(
+                v.as_str(),
+                Some("experimental" | "alpha" | "beta" | "stable")
+            )
+        }) {
+            return Err(Error::new("validation", "engineeringMaturity 无效"));
+        }
+        if fm.get("researchStatus").is_some_and(|v| {
+            !matches!(
+                v.as_str(),
+                Some("concept" | "investigating" | "prototype" | "published" | "paused")
+            )
+        }) {
+            return Err(Error::new("validation", "researchStatus 无效"));
+        }
+        for key in ["researchAreas", "references", "relatedProjects"] {
+            if let Some(value) = c.metadata.get(key) {
+                if !value
+                    .as_array()
+                    .is_some_and(|items| items.iter().all(Value::is_string))
+                {
+                    return Err(Error::new("validation", "研究关系字段必须为字符串数组"));
+                }
+                fm[key] = value.clone();
+            }
         }
         for key in ["github", "live", "release"] {
             if let Some(v) = c.metadata.get(key) {
@@ -361,7 +439,7 @@ impl Publisher for GitContent {
                 "revision", "preview",
             ],
             json!({
-                "repository_path":{"type":"string","title":"Repository path"},"profile":{"type":"string","title":"Content profile","enum":["Digital Garden Engine","Generic Markdown"],"default":"Digital Garden Engine"},"content_kind":{"type":"string","title":"Content kind","enum":["Writing","Project","Library"],"default":"Writing"},
+                "repository_path":{"type":"string","title":"Repository path"},"profile":{"type":"string","title":"Content profile","enum":["Unified Site","Digital Garden Engine","Generic Markdown"],"default":"Digital Garden Engine"},"content_kind":{"type":"string","title":"Content kind","enum":["Writing","Project","Concepts & Research","Library","About","Now"],"default":"Writing"},
                 "published_posts_path":{"type":"string","title":"Published posts path","default":"content/published/posts"},"published_projects_path":{"type":"string","title":"Published projects path","default":"content/published/projects"},"published_library_path":{"type":"string","title":"Published library path","default":"content/published/library"},"draft_path":{"type":"string","title":"Draft path","default":"content/drafts"},"private_path":{"type":"string","title":"Private path","default":"content/private"},"assets_path":{"type":"string","title":"Published assets path","default":"content/published/assets"},
                 "auto_commit":{"type":"string","title":"Auto commit","enum":["false","true"],"default":"false"},"auto_push":{"type":"string","title":"Auto push（触发现有 CI，默认关闭）","enum":["false","true"],"default":"false"},"commit_template":{"type":"string","title":"Commit template","default":"content: {{operation}} {{slug}}"}
             }),
@@ -369,7 +447,7 @@ impl Publisher for GitContent {
         )
     }
     fn target_identity(&self, cfg: &Config) -> Value {
-        json!({"repository_path":fs::canonicalize(core::field(cfg,"repository_path")).unwrap_or_else(|_|PathBuf::from(core::field(cfg,"repository_path"))),"profile":option(cfg,"profile","Digital Garden Engine")})
+        json!({"repository_path":fs::canonicalize(core::field(cfg,"repository_path")).unwrap_or_else(|_|PathBuf::from(core::field(cfg,"repository_path"))),"profile":if option(cfg,"profile","Digital Garden Engine") == "Unified Site" { "Digital Garden Engine" } else { option(cfg,"profile","Digital Garden Engine") }})
     }
     fn safe_remote_retry(&self, _cfg: &Config) -> bool {
         true
@@ -386,6 +464,7 @@ impl Publisher for GitContent {
             ("published_posts_path", "content/published/posts"),
             ("published_projects_path", "content/published/projects"),
             ("published_library_path", "content/published/library"),
+            ("published_pages_path", "content/published/pages"),
             ("draft_path", "content/drafts"),
             ("private_path", "content/private"),
             ("assets_path", "content/published/assets"),
@@ -471,7 +550,7 @@ impl Publisher for GitContent {
         let path = checked_path(&root, &relative)?;
         let draft = checked_path(&root, option(cfg, "draft_path", "content/drafts"))?;
         let private = checked_path(&root, option(cfg, "private_path", "content/private"))?;
-        for k in ["posts", "projects", "library"] {
+        for k in ["posts", "projects", "library", "pages"] {
             let published = checked_path(&root, &content_directory(cfg, "published", k))?;
             if draft.starts_with(&published)
                 || published.starts_with(&draft)
@@ -487,7 +566,10 @@ impl Publisher for GitContent {
             }
         }
 
-        if option(cfg, "profile", "Digital Garden Engine") == "Digital Garden Engine" {
+        if matches!(
+            option(cfg, "profile", "Digital Garden Engine"),
+            "Digital Garden Engine" | "Unified Site"
+        ) {
             let expected = format!(
                 "content/{}/{k}",
                 match status {
@@ -497,7 +579,7 @@ impl Publisher for GitContent {
                 }
             );
             if content_directory(cfg, status, k) != expected {
-                return Err(Error::new("boundary","Digital Garden profile 路径必须匹配 content/{published,drafts,private}/{posts,projects,library}"));
+                return Err(Error::new("boundary","Digital Garden profile 路径必须匹配 content/{published,drafts,private}/{posts,projects,library,pages}"));
             }
             if asset_directory(cfg, status)
                 != format!(
@@ -525,6 +607,57 @@ impl Publisher for GitContent {
                 "asset",
                 "Git 素材需通过可靠发布链复制到内容仓库",
             ));
+        }
+        let adoption = k == "pages"
+            && remote_id.is_none()
+            && p.content.metadata.get("_workbench_adopt_existing") == Some(&json!(true));
+        if adoption {
+            let imported = p
+                .content
+                .source_path
+                .as_ref()
+                .and_then(|s| fs::canonicalize(s).ok());
+            let target = fs::canonicalize(&path).ok();
+            let bytes =
+                fs::read(&path).map_err(|_| Error::new("git_conflict", "单例导入源不存在"))?;
+            let expected = p
+                .content
+                .metadata
+                .get("_workbench_import_hash")
+                .and_then(Value::as_str);
+            let text = String::from_utf8_lossy(&bytes);
+            let own_marker = format!("workbench article:{}", p.content.article_id);
+            if imported.is_none()
+                || imported != target
+                || expected != Some(storage::hash(&bytes).as_str())
+                || (text.contains("workbench article:") && !text.contains(&own_marker))
+            {
+                return Err(Error::new(
+                    "git_conflict",
+                    "单例路径、导入版本或文章 ID 已变化；未绑定或覆盖",
+                ));
+            }
+        }
+        if k == "pages" && action != Action::Delete {
+            for visibility in ["draft", "private", "published"] {
+                for extension in ["md", "mdx"] {
+                    let existing = format!(
+                        "{}/{}.{}",
+                        content_directory(cfg, visibility, k),
+                        p.content.slug,
+                        extension
+                    );
+                    if checked_path(&root, &existing)?.exists()
+                        && remote_id != Some(existing.as_str())
+                        && !(adoption && existing == relative)
+                    {
+                        return Err(Error::new(
+                            "git_conflict",
+                            "About/Now 单例已存在；需通过已有文章映射更新，未覆盖或生成重复页面",
+                        ));
+                    }
+                }
+            }
         }
         let body = document(&p.content, cfg, status)?;
         let after = if action == Action::Delete {
@@ -626,7 +759,7 @@ impl Publisher for GitContent {
                 } else {
                     None
                 };
-                if before.is_some() && remote_id != Some(relative.as_str()) {
+                if before.is_some() && remote_id != Some(relative.as_str()) && !adoption {
                     return Err(Error::new(
                         "git_conflict",
                         "目标 slug 已存在但无此文章映射，未覆盖",
@@ -775,23 +908,30 @@ pub fn detect_gardens(parent: &Path) -> Vec<Value> {
     if let Ok(entries) = fs::read_dir(parent) {
         for e in entries.flatten() {
             let root = e.path();
-            if !root.join("engine.lock.json").is_file()
+            let unified = fs::read_to_string(root.join("site.manifest.json"))
+                .ok()
+                .and_then(|s| serde_json::from_str::<Value>(&s).ok())
+                .is_some_and(|v| {
+                    v["schemaVersion"] == 1
+                        && v["kind"] == "styayur-site"
+                        && v["contentRoot"] == "content"
+                        && v["published"] == "published"
+                        && v["drafts"] == "drafts"
+                        && v["private"] == "private"
+                });
+            let legacy = fs::read_to_string(root.join("engine.lock.json"))
+                .ok()
+                .and_then(|s| serde_json::from_str::<Value>(&s).ok())
+                .is_some_and(|v| v["repository"] == "styayur/digital-garden-engine");
+            if !(unified || legacy)
                 || !root.join("content/published").is_dir()
                 || !root.join("content/drafts").is_dir()
             {
                 continue;
             }
-            let lock = fs::read_to_string(root.join("engine.lock.json"))
-                .ok()
-                .and_then(|s| serde_json::from_str::<Value>(&s).ok());
-            if lock.as_ref().and_then(|v| v["repository"].as_str())
-                != Some("styayur/digital-garden-engine")
-            {
-                continue;
-            }
             let site = fs::read_to_string(root.join("site.config.ts")).unwrap_or_default();
             let site = site_re.find(&site).map(|m| m.as_str().to_owned());
-            found.push(json!({"extension_id":"git-content","label":site.unwrap_or_else(||e.file_name().to_string_lossy().into_owned()),"config":{"repository_path":root.to_string_lossy(),"profile":"Digital Garden Engine","auto_commit":"false","auto_push":"false"},"evidence":"engine.lock.json + content/published + content/drafts + site.config.ts"}));
+            found.push(json!({"extension_id":"git-content","label":site.unwrap_or_else(||e.file_name().to_string_lossy().into_owned()),"config":{"repository_path":root.to_string_lossy(),"profile":if unified {"Unified Site"} else {"Digital Garden Engine"},"auto_commit":"false","auto_push":"false"},"evidence":if unified {"site.manifest.json v1 + bounded content directories"} else {"engine.lock.json + content/published + content/drafts + site.config.ts"}}));
         }
     }
     found
