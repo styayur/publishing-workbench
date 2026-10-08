@@ -22,6 +22,9 @@ export function importContent(text: string, json: boolean): Content {
     const articleMarker = body.match(
       /<!-- workbench article:([0-9a-f-]{36}) -->/i,
     )?.[1];
+    body = body
+      .replace(/^\s*<!-- workbench article:[0-9a-f-]{36} -->\s*$/gm, '')
+      .trimEnd();
     return {
       ...sample,
       article_id:

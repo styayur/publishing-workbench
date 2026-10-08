@@ -608,8 +608,7 @@ impl Publisher for GitContent {
                 "Git 素材需通过可靠发布链复制到内容仓库",
             ));
         }
-        let adoption = k == "pages"
-            && remote_id.is_none()
+        let adoption = remote_id.is_none()
             && p.content.metadata.get("_workbench_adopt_existing") == Some(&json!(true));
         if adoption {
             let imported = p
@@ -618,8 +617,7 @@ impl Publisher for GitContent {
                 .as_ref()
                 .and_then(|s| fs::canonicalize(s).ok());
             let target = fs::canonicalize(&path).ok();
-            let bytes =
-                fs::read(&path).map_err(|_| Error::new("git_conflict", "单例导入源不存在"))?;
+            let bytes = fs::read(&path).map_err(|_| Error::new("git_conflict", "导入源不存在"))?;
             let expected = p
                 .content
                 .metadata
@@ -634,7 +632,7 @@ impl Publisher for GitContent {
             {
                 return Err(Error::new(
                     "git_conflict",
-                    "单例路径、导入版本或文章 ID 已变化；未绑定或覆盖",
+                    "源文件路径、导入版本或文章 ID 已变化；未绑定或覆盖",
                 ));
             }
         }

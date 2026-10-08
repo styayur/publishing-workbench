@@ -399,6 +399,17 @@ async fn unified_site_checkout() {
         if selection == "Concepts & Research" {
             a.metadata.insert("researchStatus".into(), json!("concept"));
         }
+        if selection == "Project" {
+            a.cover = Some(
+                root.join("content/published/assets/projects/publishing-workbench.png")
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+            a.metadata.insert(
+                "imageAlt".into(),
+                json!("Actual Workbench screenshot reused in a disposable integration clone"),
+            );
+        }
         let draft = p
             .start(
                 "git-content",
@@ -574,6 +585,72 @@ async fn reviewed_singleton_adoption_preserves_revision_and_backup() {
         .unwrap();
     assert_eq!(rejected.status, "failed");
     assert_eq!(rejected.error.unwrap().code, "git_conflict");
+}
+#[tokio::test]
+async fn reviewed_existing_writing_project_and_library_imports() {
+    for (selection, directory) in [
+        ("Writing", "posts"),
+        ("Project", "projects"),
+        ("Library", "library"),
+    ] {
+        let t = repo();
+        let configuration = gitcfg(t.path(), true);
+        let publisher = core();
+        let mut a = c();
+        a.metadata.insert("content_kind".into(), json!(selection));
+        let original = document(&a, &configuration, "published").unwrap();
+        let original = original.split("<!-- workbench article:").next().unwrap();
+        let file = t
+            .path()
+            .join(format!("content/published/{directory}/reliable-test.md"));
+        fs::create_dir_all(file.parent().unwrap()).unwrap();
+        fs::write(&file, original).unwrap();
+        git(t.path(), &["add", "."]);
+        git(t.path(), &["commit", "-m", "manual content"]);
+        a.source_path = Some(
+            fs::canonicalize(&file)
+                .unwrap()
+                .to_string_lossy()
+                .into_owned(),
+        );
+        a.metadata.insert(
+            "_workbench_import_hash".into(),
+            json!(hash(original.as_bytes())),
+        );
+        a.metadata
+            .insert("_workbench_adopt_existing".into(), json!(true));
+        a.body.push_str("\nReviewed edit.");
+        let adopted = publisher
+            .start(
+                "git-content",
+                Action::Publish,
+                a.clone(),
+                &configuration,
+                None,
+            )
+            .await
+            .unwrap();
+        assert_eq!(adopted.status, "success", "{:?}", adopted.error);
+        assert_eq!(
+            git(
+                t.path(),
+                &[
+                    "show",
+                    &format!("HEAD~1:content/published/{directory}/reliable-test.md")
+                ]
+            ),
+            original
+        );
+        let id = a.article_id.clone();
+        a.body.push_str("\nLater update.");
+        let update = publisher
+            .start("git-content", Action::Update, a, &configuration, None)
+            .await
+            .unwrap();
+        assert_eq!(update.status, "success", "{:?}", update.error);
+        assert!(fs::read_to_string(&file).unwrap().contains(&id));
+        assert!(git(t.path(), &["status", "--porcelain"]).is_empty());
+    }
 }
 #[tokio::test]
 async fn git_commit_mdx_promote_update_delete() {
