@@ -38,7 +38,7 @@ export function importContent(text: string, json: boolean): Content {
       slug: typeof metadata.slug === 'string' ? metadata.slug : '',
       summary:
         typeof metadata.description === 'string' ? metadata.description : '',
-      cover: null,
+      cover: typeof metadata.image === 'string' ? metadata.image : null,
       authors: [],
       tags:
         Array.isArray(metadata.tags) &&

@@ -127,11 +127,9 @@ fn import_file(
     }
     content.ensure_id();
     content.source_path = Some(source);
-    let original = std::fs::read(content.source_path.as_ref().expect("import source"))
-        .map_err(|_| Error::new("import", "无法校验导入源文件"))?;
     content.metadata.insert(
         "_workbench_import_hash".into(),
-        serde_json::json!(crate::storage::hash(&original)),
+        serde_json::json!(crate::storage::hash(raw.as_bytes())),
     );
     content.metadata.remove("_workbench_adopt_existing");
     state.store.save_article(&content)?;
