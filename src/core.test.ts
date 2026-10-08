@@ -40,6 +40,15 @@ describe('capability-driven UI', () => {
 });
 
 describe('v0.2 identity and garden frontmatter', () => {
+  it('preserves Git article marker and project screenshot on import', () => {
+    const id = '2af923e4-6e5f-4da9-93c6-40b7778159f1';
+    const a = importContent(
+      `---\ntitle: Project\nimage: /garden-assets/example.png\n---\nBody\n\n<!-- workbench article:${id} -->`,
+      false,
+    );
+    expect(a.article_id).toBe(id);
+    expect(a.cover).toBe('/garden-assets/example.png');
+  });
   it('preserves article identity when roundtripping exported JSON', () => {
     const a = importContent('# Title', false);
     const b = importContent(JSON.stringify({ ...a, title: 'Changed' }), true);

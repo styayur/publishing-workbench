@@ -20,6 +20,7 @@ fn c() -> Content {
         slug: "reliable-test".into(),
         summary: "A safe fixture".into(),
         body: "# Test\n\nBody".into(),
+        metadata: cfg(json!({"date":"2026-10-08"})),
         ..Default::default()
     }
 }
@@ -316,6 +317,263 @@ fn digital_garden_profiles_and_path_boundary() {
     for bad in ["../outside", ".git/config", "/absolute"] {
         assert!(checked_path(t.path(), bad).is_err());
     }
+}
+#[test]
+fn unified_dates_research_and_singletons() {
+    let mut a = c();
+    let configuration = cfg(json!({"profile":"Unified Site"}));
+    a.metadata.remove("date");
+    assert!(!document(&a, &configuration, "draft")
+        .unwrap()
+        .contains("date:"));
+    assert!(document(&a, &configuration, "published").is_err());
+    for invalid in ["2026-02-30", "2026-2-03", "2026-10-08T00:00:00Z"] {
+        a.metadata.insert("date".into(), json!(invalid));
+        assert!(document(&a, &configuration, "published").is_err());
+    }
+    a.metadata.insert("date".into(), json!("2026-10-08"));
+    for (selection, slug) in [("About", "about"), ("Now", "now")] {
+        a.metadata.insert("content_kind".into(), json!(selection));
+        a.slug = slug.into();
+        assert!(document(&a, &configuration, "published").is_ok());
+        a.slug = "other".into();
+        assert!(document(&a, &configuration, "published").is_err());
+    }
+    a.metadata
+        .insert("content_kind".into(), json!("Concepts & Research"));
+    a.metadata
+        .insert("engineeringMaturity".into(), json!("alpha"));
+    a.metadata.insert("researchStatus".into(), json!("concept"));
+    a.metadata.insert("updatedAt".into(), json!("2026-10-07"));
+    let text = document(&a, &configuration, "published").unwrap();
+    assert!(text.contains("category: \"concepts\""));
+    assert!(text.contains("engineeringMaturity: \"alpha\""));
+    assert!(text.contains("updatedAt: \"2026-10-07\""));
+}
+#[tokio::test]
+#[ignore = "requires an explicitly supplied real unified-site checkout"]
+async fn unified_site_checkout() {
+    let source = std::env::var("WORKBENCH_SITE_E2E_ROOT").expect("set WORKBENCH_SITE_E2E_ROOT");
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().join("site");
+    let output = Command::new("git")
+        .args(["clone", "--no-hardlinks", &source, root.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    git(&root, &["config", "user.email", "test@example.invalid"]);
+    git(&root, &["config", "user.name", "Workbench integration"]);
+    assert!(root.join("site.manifest.json").exists());
+    // Only the disposable clone is changed; the supplied source is never written.
+    for slug in ["about", "now"] {
+        for extension in ["md", "mdx"] {
+            let file = root.join(format!("content/published/pages/{slug}.{extension}"));
+            if file.exists() {
+                fs::remove_file(file).unwrap();
+            }
+        }
+    }
+    git(&root, &["add", "content/published/pages"]);
+    git(
+        &root,
+        &["commit", "-m", "test: disposable singleton baseline"],
+    );
+    let found = publishing_workbench::extensions::git_content::detect_gardens(temporary.path());
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0]["config"]["profile"], "Unified Site");
+    let mut configuration = gitcfg(&root, true);
+    configuration.insert("profile".into(), json!("Unified Site"));
+    let p = core();
+    for (selection, slug, directory) in [
+        ("Writing", "workbench-e2e-writing", "posts"),
+        ("Project", "workbench-e2e-project", "projects"),
+        ("Concepts & Research", "workbench-e2e-concept", "projects"),
+        ("Library", "workbench-e2e-library", "library"),
+        ("About", "about", "pages"),
+        ("Now", "now", "pages"),
+    ] {
+        let mut a = c();
+        a.slug = slug.into();
+        a.format = "mdx".into();
+        a.metadata.insert("content_kind".into(), json!(selection));
+        if selection == "Concepts & Research" {
+            a.metadata.insert("researchStatus".into(), json!("concept"));
+        }
+        let draft = p
+            .start(
+                "git-content",
+                Action::CreateDraft,
+                a.clone(),
+                &configuration,
+                None,
+            )
+            .await
+            .unwrap();
+        assert_eq!(draft.status, "success", "{:?}", draft.error);
+        assert!(root
+            .join(format!("content/drafts/{directory}/{slug}.mdx"))
+            .exists());
+        let published = p
+            .start(
+                "git-content",
+                Action::Publish,
+                a.clone(),
+                &configuration,
+                None,
+            )
+            .await
+            .unwrap();
+        assert_eq!(published.status, "success", "{:?}", published.error);
+        a.body.push_str("\nUpdated integration sample.");
+        let updated = p
+            .start(
+                "git-content",
+                Action::Update,
+                a.clone(),
+                &configuration,
+                None,
+            )
+            .await
+            .unwrap();
+        assert_eq!(updated.status, "success", "{:?}", updated.error);
+        let unchanged = p
+            .start("git-content", Action::Update, a, &configuration, None)
+            .await
+            .unwrap();
+        assert_eq!(unchanged.status, "success");
+        assert_eq!(unchanged.operation, "unchanged");
+        assert!(root
+            .join(format!("content/published/{directory}/{slug}.mdx"))
+            .exists());
+        assert!(!root
+            .join(format!("content/drafts/{directory}/{slug}.mdx"))
+            .exists());
+    }
+    assert!(git(&root, &["status", "--porcelain"]).is_empty());
+    let validation = Command::new("node")
+        .arg(Path::new(&source).join("scripts/validate-content.mjs"))
+        .args(["--source", root.to_str().unwrap()])
+        .current_dir(&source)
+        .output()
+        .unwrap();
+    assert!(
+        validation.status.success(),
+        "{}",
+        String::from_utf8_lossy(&validation.stderr)
+    );
+}
+#[tokio::test]
+async fn singleton_mapping_update_and_duplicate_refusal() {
+    let t = repo();
+    let mut configuration = gitcfg(t.path(), true);
+    configuration.insert("profile".into(), json!("Unified Site"));
+    let p = core();
+    let mut a = c();
+    a.slug = "now".into();
+    a.metadata.insert("content_kind".into(), json!("Now"));
+    let draft = p
+        .start(
+            "git-content",
+            Action::CreateDraft,
+            a.clone(),
+            &configuration,
+            None,
+        )
+        .await
+        .unwrap();
+    assert_eq!(draft.status, "success", "{:?}", draft.error);
+    let published = p
+        .start(
+            "git-content",
+            Action::Publish,
+            a.clone(),
+            &configuration,
+            None,
+        )
+        .await
+        .unwrap();
+    assert_eq!(published.status, "success", "{:?}", published.error);
+    assert!(!t.path().join("content/drafts/pages/now.md").exists());
+    a.body.push_str("\nUpdated safely.");
+    let updated = p
+        .start(
+            "git-content",
+            Action::Update,
+            a.clone(),
+            &configuration,
+            None,
+        )
+        .await
+        .unwrap();
+    assert_eq!(updated.status, "success", "{:?}", updated.error);
+    a.article_id = uuid::Uuid::new_v4().to_string();
+    a.format = "mdx".into();
+    let duplicate = p
+        .start("git-content", Action::Publish, a, &configuration, None)
+        .await
+        .unwrap();
+    assert_eq!(duplicate.status, "failed");
+    assert_eq!(duplicate.error.unwrap().code, "git_conflict");
+    assert!(!t.path().join("content/published/pages/now.mdx").exists());
+}
+#[tokio::test]
+async fn reviewed_singleton_adoption_preserves_revision_and_backup() {
+    let t = repo();
+    let configuration = gitcfg(t.path(), true);
+    let p = core();
+    let mut a = c();
+    a.slug = "about".into();
+    a.metadata.insert("content_kind".into(), json!("About"));
+    let original = document(&a, &configuration, "published").unwrap();
+    // A manual file has no Workbench identity marker.
+    let original = original
+        .split("<!-- workbench article:")
+        .next()
+        .unwrap()
+        .to_owned();
+    let file = t.path().join("content/published/pages/about.md");
+    fs::create_dir_all(file.parent().unwrap()).unwrap();
+    fs::write(&file, &original).unwrap();
+    git(t.path(), &["add", "."]);
+    git(t.path(), &["commit", "-m", "manual page"]);
+    a.source_path = Some(
+        fs::canonicalize(&file)
+            .unwrap()
+            .to_string_lossy()
+            .into_owned(),
+    );
+    a.metadata.insert(
+        "_workbench_import_hash".into(),
+        json!(hash(original.as_bytes())),
+    );
+    a.metadata
+        .insert("_workbench_adopt_existing".into(), json!(true));
+    a.body.push_str("\nReviewed edit.");
+    let adopted = p
+        .start(
+            "git-content",
+            Action::Publish,
+            a.clone(),
+            &configuration,
+            None,
+        )
+        .await
+        .unwrap();
+    assert_eq!(adopted.status, "success", "{:?}", adopted.error);
+    let backup = git(
+        t.path(),
+        &["show", "HEAD~1:content/published/pages/about.md"],
+    );
+    assert_eq!(backup, original);
+    assert!(fs::read_to_string(&file).unwrap().contains(&a.article_id));
+    assert!(git(t.path(), &["status", "--porcelain"]).is_empty());
+    a.article_id = uuid::Uuid::new_v4().to_string();
+    let rejected = p
+        .start("git-content", Action::Publish, a, &configuration, None)
+        .await
+        .unwrap();
+    assert_eq!(rejected.status, "failed");
+    assert_eq!(rejected.error.unwrap().code, "git_conflict");
 }
 #[tokio::test]
 async fn git_commit_mdx_promote_update_delete() {

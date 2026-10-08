@@ -127,6 +127,11 @@ fn import_file(
     }
     content.ensure_id();
     content.source_path = Some(source);
+    content.metadata.insert(
+        "_workbench_import_hash".into(),
+        serde_json::json!(crate::storage::hash(raw.as_bytes())),
+    );
+    content.metadata.remove("_workbench_adopt_existing");
     state.store.save_article(&content)?;
     Ok(content)
 }

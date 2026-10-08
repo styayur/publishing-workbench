@@ -103,6 +103,22 @@ export function Editor({
           </button>
         </details>
       )}
+      {desktop && content.source_path && (
+        <label>
+          <input
+            type="checkbox"
+            checked={content.metadata._workbench_adopt_existing === true}
+            onChange={(e) =>
+              set('metadata', {
+                ...content.metadata,
+                _workbench_adopt_existing: e.target.checked,
+              })
+            }
+          />
+          绑定已导入的 About／Now
+          原文件（只接受同一路径和未变化的文件；保留事务备份）
+        </label>
+      )}
       <label>
         正文格式
         <select
@@ -113,6 +129,66 @@ export function Editor({
           <option value="mdx">MDX（Git；预览不执行 JSX）</option>
         </select>
       </label>
+      <div className="fields">
+        <label>
+          站点内容类型
+          <select
+            value={String(content.metadata.content_kind ?? 'Writing')}
+            onChange={(e) =>
+              onChange({
+                ...content,
+                slug:
+                  e.target.value === 'About'
+                    ? 'about'
+                    : e.target.value === 'Now'
+                      ? 'now'
+                      : content.slug,
+                metadata: { ...content.metadata, content_kind: e.target.value },
+              })
+            }
+          >
+            {[
+              'Writing',
+              'Project',
+              'Concepts & Research',
+              'Library',
+              'About',
+              'Now',
+            ].map((kind) => (
+              <option key={kind}>{kind}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          发布日期（草稿可留空）
+          <input
+            type="date"
+            value={String(content.metadata.date ?? '')}
+            onChange={(e) => {
+              const next = { ...content.metadata };
+              if (e.target.value) next.date = e.target.value;
+              else delete next.date;
+              set('metadata', next);
+            }}
+          />
+        </label>
+      </div>
+      {['Project', 'Concepts & Research'].includes(
+        String(content.metadata.content_kind),
+      ) && (
+        <label>
+          项目截图说明（alt）
+          <input
+            value={String(content.metadata.imageAlt ?? '')}
+            onChange={(e) =>
+              set('metadata', { ...content.metadata, imageAlt: e.target.value })
+            }
+          />
+          <small>
+            封面字段可选择真实截图；Git 发布会按内容状态复制和去重素材。
+          </small>
+        </label>
+      )}
       <label>
         文章标题
         <input
