@@ -45,9 +45,40 @@ Settings 设置相对图片的根目录；未设置时，从路径导入的文�
 
 ## 架构与目录
 
+<!-- architecture:overview:start -->
+
+```mermaid
+flowchart TB
+  subgraph webview[React / TypeScript WebView]
+    Editor[Editor and Canonical Content]
+  end
+  subgraph rust[Rust desktop process]
+    IPC[Tauri commands]
+    Core[ReliablePublishing]
+    Transform[Publisher transform and asset snapshot]
+    Ext[Built-in Publisher adapters]
+    DB[(SQLite journal / mappings / assets)]
+    Keys[(OS keyring)]
+    IPC --> Core
+    Core --> Transform --> Ext
+    Core <-->|checkpoints and resume| DB
+    Keys --> IPC
+  end
+  Editor -->|invoke / serialized Content| IPC
+  Ext -->|HTTPS API| Remote[WordPress / WeChat / Generic REST]
+  Ext -->|file transaction; optional Git commit and push| Repo[(Local content repository)]
+  Ext -->|receipt| Core
+```
+
+<!-- architecture:overview:end -->
+
+桌面 `dispatch` 先进入 `ReliablePublishing::start`，后者选择 Publisher 并调用 transform；不是前端先完成平台转换。内置 Registry 是 Rust trait 分派，不是独立插件进程。SQLite 保存任务、步骤、映射和素材，凭据由桌面端从 OS keyring 读取。
+
+失败后 Retry 使用原任务快照。未知远端结果进入 `needs_reconciliation`，不能保证任意外部 API 恰好执行一次；Git Content 使用文件事务核对恢复。启动把遗留 running 任务标为 interrupted。工作台不执行网站生产部署；可选 Git push 后的 CI 属于目标仓库。现有截图仅证明 v0.2.1 原生预览，后续 CMS 代码不因此被宣称已发布。
+
+[Source evidence and diagram verification](docs/architecture/README.md).
+
 ```text
-Content Core → Canonical Content → Transform → Reliable Publishing Core
-                                             → Extension Runtime → targets
 src-tauri/
   content/                    # Canonical model / stable article ID
   core/                       # HTTP/error/config helpers
