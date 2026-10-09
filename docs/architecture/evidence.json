@@ -1,0 +1,47 @@
+{
+  "source_commit": "2dfc1b516e1b0a544b067c70f87542a080ada7ab",
+  "reviewed_on": "2026-10-09",
+  "diagram_source": "README.md",
+  "sources": [
+    {
+      "path": "src/api.ts",
+      "anchors": ["invoke<T>"]
+    },
+    {
+      "path": "src-tauri/desktop.rs",
+      "anchors": ["async fn dispatch", "async fn retry_job", "keyring::Entry"]
+    },
+    {
+      "path": "src-tauri/content/mod.rs",
+      "anchors": ["pub struct Content"]
+    },
+    {
+      "path": "src-tauri/publishing/reliable.rs",
+      "anchors": [
+        "publisher.transform",
+        "publisher.recover",
+        "needs_reconciliation"
+      ]
+    },
+    {
+      "path": "src-tauri/storage/mod.rs",
+      "anchors": ["interrupted", "pub fn save_job"]
+    },
+    {
+      "path": "src-tauri/extensions/mod.rs",
+      "anchors": ["pub fn builtins"]
+    },
+    {
+      "path": "src-tauri/extensions/git_content/mod.rs",
+      "anchors": ["fn safe_remote_retry", "transactions"]
+    },
+    {
+      "path": "src-tauri/tests/reliable.rs",
+      "anchors": ["#[tokio::test]"]
+    },
+    {
+      "path": "src-tauri/publishing/mod.rs",
+      "anchors": ["pub struct Registry", "pub trait Publisher"]
+    }
+  ]
+}
