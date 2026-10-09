@@ -79,8 +79,6 @@ flowchart TB
 [Source evidence and diagram verification](docs/architecture/README.md).
 
 ```text
-Content Core → Canonical Content → Transform → Reliable Publishing Core
-                                             → Extension Runtime → targets
 src-tauri/
   content/                    # Canonical model / stable article ID
   core/                       # HTTP/error/config helpers
