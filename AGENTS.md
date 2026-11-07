@@ -33,6 +33,7 @@ npm run build
 ```
 
 Authoritative CI entrypoints:
+
 - `.github/workflows/architecture.yml` — Architecture documentation
 - `.github/workflows/ci.yml` — Workbench checks
 
