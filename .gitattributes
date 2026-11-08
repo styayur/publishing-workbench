@@ -2,3 +2,5 @@
 *.png binary
 *.ico binary
 *.icns binary
+
+.github/workflows/*.lock.yml linguist-generated=true
