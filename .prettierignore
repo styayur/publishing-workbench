@@ -6,3 +6,6 @@ package-lock.json
 src-tauri/gen
 test-results
 tests/manifests.fixture.json
+
+# gh-aw compiler-owned output; format sources and regenerate locks.
+.github/workflows/*.lock.yml
