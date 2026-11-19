@@ -47,3 +47,7 @@ fs2 = "0.4"
 [dev-dependencies]
 wiremock = "0.6"
 tempfile = "3"
+
+# GTK3-compatible RUSTSEC-2024-0429 backport; see security/glib-backport.md.
+[patch.crates-io]
+glib = { path = "../vendor/glib" }

@@ -2,3 +2,7 @@
 *.png binary
 *.ico binary
 *.icns binary
+
+# Preserve verified upstream/backport payload bytes on every platform.
+vendor/glib/** text eol=lf
+security/** text eol=lf

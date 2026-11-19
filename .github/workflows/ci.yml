@@ -17,6 +17,7 @@ jobs:
         with:
           components: rustfmt, clippy
       - run: npm ci
+      - run: npm run check:minimatch
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
       - run: cargo test --locked --manifest-path src-tauri/Cargo.toml
