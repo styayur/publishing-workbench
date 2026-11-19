@@ -9,7 +9,8 @@
     "tauri": "tauri",
     "lint": "eslint src && prettier --check .",
     "format": "prettier --write .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check:minimatch": "node security/verify-minimatch.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.4",
@@ -37,5 +38,10 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/styayur/publishing-workbench.git"
+  },
+  "overrides": {
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "11.0.4"
+    }
   }
 }

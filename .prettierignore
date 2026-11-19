@@ -6,3 +6,6 @@ package-lock.json
 src-tauri/gen
 test-results
 tests/manifests.fixture.json
+
+# Upstream MIT crate is hash-bound, not reformatted.
+vendor/
